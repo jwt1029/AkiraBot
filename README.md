@@ -1,0 +1,2 @@
+# AkiraBot
+Discord bot アキラさんです
