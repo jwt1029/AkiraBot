@@ -7,6 +7,7 @@ const getYoutubeID = require("get-youtube-id");
 const fetchVideoInfo = require("youtube-info");
 const ffmpeg = require('fluent-ffmpeg');
 const WitSpeech = require('node-witai-speech');
+const decode = require('./decodeOpus.js');
 const fs = require('fs');
 const path = require('path');
 const opus = require('node-opus');
@@ -27,11 +28,13 @@ var listening = false;
 
 const recordingsPath = makeDir('./recordings');
 
-
+// Log in
+client.login('NDI4MzgwOTE4NjkyOTcwNTA3.DZyRZA.u5LCbn9IaVc6JkCtbg4GEEs_cxU');
 client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
 });
 
+// Read message
 client.on('message', msg => {
     if (msg.content === 'ping') {
         msg.reply('Pong!');
@@ -46,6 +49,7 @@ client.on('message', msg => {
     }
 });
 
+// Command handler
 function commandListen(message) {
     member = message.member;
     if (!member) {
@@ -70,8 +74,8 @@ function commandListen(message) {
     voiceChannel.join().then((connection) => {
         //listenConnection.set(member.voiceChannelId, connection);
         listenConnection = connection;
-
         let receiver = connection.createReceiver();
+        // WHY CAN NOT HANDLE 'opus'...
         receiver.on('opus', function(user, data) {
             let hexString = data.toString('hex');
             let stream = listenStreams.get(user.id);
@@ -90,6 +94,38 @@ function commandListen(message) {
     }).catch(console.error);
 }
 
+function commandLeave() {
+    listening = false;
+    queue = []
+    if (dispatcher) {
+        dispatcher.end();
+    }
+    dispatcher = null;
+    commandStop();
+    if (listenReceiver) {
+        listenReceiver.destroy();
+        listenReceiver = null;
+    }
+    if (listenConnection) {
+        listenConnection.disconnect();
+        listenConnection = null;
+    }
+    if (voiceChannel) {
+        voiceChannel.leave();
+        voiceChannel = null;
+    }
+}
+
+function commandStop() {
+    if (listenReceiver) {
+        listening = false;
+        listenReceiver.destroy();
+        listenReceiver = null;
+        textChannel.send("Stopped listening!");
+    }
+}
+
+// Speacking recognizor
 client.on('guildMemberSpeaking', (member, speaking) => {
     // Close the writeStream when a member stops speaking
     if (!speaking && member.voiceChannel) {
@@ -121,32 +157,15 @@ client.on('guildMemberSpeaking', (member, speaking) => {
         }
     }
 });
+
 function handleSpeech(member, speech) {
     var command = speech.toLowerCase().split(' ');
     console.log(command);
 }
 
-
-function commandLeave() {
-    listening = false;
-    queue = []
-    if (dispatcher) {
-        dispatcher.end();
-    }
-    dispatcher = null;
-    commandStop();
-    if (listenReceiver) {
-        listenReceiver.destroy();
-        listenReceiver = null;
-    }
-    if (listenConnection) {
-        listenConnection.disconnect();
-        listenConnection = null;
-    }
-    if (voiceChannel) {
-        voiceChannel.leave();
-        voiceChannel = null;
-    }
+// Sub module
+function makeDir(dir) {
+    try {
+        fs.mkdirSync(dir);
+    } catch (err) {}
 }
-
-client.login('NDI4MzgwOTE4NjkyOTcwNTA3.DZyRZA.u5LCbn9IaVc6JkCtbg4GEEs_cxU');
